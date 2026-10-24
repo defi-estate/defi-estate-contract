@@ -19,7 +19,7 @@ mod test;
 pub use errors::Error;
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, token, Address, BytesN, Env, Map,
+    contract, contractimpl, panic_with_error, token, Address, BytesN, Env, Map, Vec,
 };
 use storage::DataKey;
 
@@ -169,6 +169,12 @@ impl YieldDistributor {
     pub fn cancel_admin_proposal(env: Env) {
         storage::admin(&env).require_auth();
         env.storage().instance().remove(&DataKey::PendingAdmin);
+    }
+
+    /// Extends the TTL of the instance and of each account's claimable entry.
+    /// Permissionless: anyone may keep entries alive to avoid archival.
+    pub fn bump(env: Env, accounts: Vec<Address>) {
+        storage::bump(&env, &accounts);
     }
 
     /// Replaces this contract's code in place. Admin auth required.

@@ -349,6 +349,85 @@ fn upgrade_requires_admin_auth() {
 }
 
 #[test]
+fn bump_keeps_claimable_entries_live_past_original_ttl() {
+    let s = setup();
+    let alice = Address::generate(&s.env);
+    let bob = Address::generate(&s.env);
+    whitelist(&s, &alice);
+    whitelist(&s, &bob);
+
+    s.client.distribute(&map![
+        &s.env,
+        (alice.clone(), 700i128),
+        (bob.clone(), 300i128)
+    ]);
+
+    // Advance well past the original TTL without any interaction.
+    s.env.ledger().set_sequence_number(10_000);
+
+    s.client.bump(&vec![&s.env, alice.clone(), bob.clone()]);
+
+    // Entries are still readable and hold their values after the bump.
+    assert_eq!(s.client.claimable(&alice), 700);
+    assert_eq!(s.client.claimable(&bob), 300);
+    assert_eq!(s.client.total_distributed(), 1_000);
+    assert_eq!(s.client.round(), 1);
+
+    // Claims still succeed after the bump.
+    assert_eq!(s.client.claim(&alice), 700);
+    assert_eq!(s.usdc.balance(&alice), 700);
+}
+
+#[test]
+fn bump_without_claimable_entry_succeeds() {
+    let s = setup();
+    let carol = Address::generate(&s.env);
+
+    // No distribution has happened, so carol has no claimable entry.
+    s.env.ledger().set_sequence_number(10_000);
+    s.client.bump(&vec![&s.env, carol.clone()]);
+
+    assert_eq!(s.client.claimable(&carol), 0);
+    assert_eq!(s.client.round(), 0);
+}
+
+// Network transaction limits for a single Soroban transaction.
+// Source: Stellar network resource limits (Soroban), as of the current
+// protocol: 100M CPU instructions and 40MB memory per transaction.
+// https://developers.stellar.org/docs/learn/smart-contract-internals/resource-limits
+const NETWORK_MAX_CPU_INSTRUCTIONS: u64 = 100_000_000;
+const NETWORK_MAX_MEMORY_BYTES: u64 = 40 * 1024 * 1024;
+
+#[test]
+fn distribute_to_max_allocations_stays_within_budget() {
+    let s = setup();
+    let mut allocations = Map::new(&s.env);
+    for i in 0..MAX_ALLOCATIONS {
+        let holder = Address::generate(&s.env);
+        whitelist(&s, &holder);
+        allocations.set(holder, (i as i128) + 1);
+    }
+
+    s.client.distribute(&allocations);
+
+    let budget = s.env.cost_estimate().budget();
+    let cpu = budget.cpu_instruction_cost();
+    let mem = budget.memory_bytes_cost();
+
+    // Stay below 80% of the network transaction limits.
+    let cpu_limit = NETWORK_MAX_CPU_INSTRUCTIONS * 80 / 100;
+    let mem_limit = NETWORK_MAX_MEMORY_BYTES * 80 / 100;
+    assert!(
+        cpu < cpu_limit,
+        "CPU instructions {cpu} exceed 80% of network limit {cpu_limit}"
+    );
+    assert!(
+        mem < mem_limit,
+        "memory bytes {mem} exceed 80% of network limit {mem_limit}"
+    );
+}
+
+#[test]
 fn reclaim_before_window_expires_fails() {
     let s = setup();
     let alice = Address::generate(&s.env);

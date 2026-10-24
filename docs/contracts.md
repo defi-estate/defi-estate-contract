@@ -27,6 +27,7 @@ Capped, whitelist-gated share token with 0 decimals.
 | `cancel_admin_proposal()`                                                                                       | admin    | clears the pending admin                |
 | `set_admin(new_admin)`                                                                                          | admin    |                                         |
 | `upgrade(new_wasm_hash)`                                                                                        | admin    | in-place wasm upgrade                   |
+| `bump(accounts)`                                                                                                | none     | extends instance TTL and each holder's balance TTL |
 | `balance`, `total_supply`, `max_supply`, `max_per_holder`, `is_whitelisted`, `is_frozen`, `name`, `symbol`, `decimals`, `property_id`, `admin`, `allowance`, `is_paused`, `pending_admin` | none     | views                                   |
 | `version`                                                                                                       | none     | crate version constant                  |
 
@@ -66,6 +67,7 @@ Holds rental income in a payout asset (for example a USDC Stellar Asset Contract
 | `accept_admin()`                                                                                                | new admin| completes admin transfer                                                |
 | `cancel_admin_proposal()`                                                                                       | admin    | clears the pending admin                                                |
 | `upgrade(new_wasm_hash)`                                                                                        | admin    | in-place wasm upgrade                                                   |
+| `bump(accounts)`                                                                                                | none     | extends instance TTL and each account's claimable TTL                   |
 | `claimable`, `round`, `round_info`, `total_distributed`, `total_claimed`, `payout_token`, `share_token`, `admin`, `pending_admin` | none     | views                                                                   |
 | `version`                                                                                                       | none     | crate version constant                                                  |
 
@@ -89,6 +91,27 @@ pub struct RoundInfo {
 ```
 
 The record is written to persistent storage under `DataKey::Round(u32)` (the round number, matching the value returned by `round()`), and its TTL is extended like other persistent entries. `round_info(round)` returns `Some(RoundInfo)` for a past round and `None` for an unknown round.
+
+### Distribution budget
+
+`MAX_ALLOCATIONS` is currently **100** recipients per `distribute` call. The budget test in `contracts/yield-distributor/src/test.rs` distributes to 100 recipients and reads `env.cost_estimate().budget()`; it asserts CPU instructions and memory stay below 80% of the network transaction limits, leaving 20% headroom for envelope overhead, auth and future code changes. Measured cost per recipient (from that test):
+
+| Metric              | Per recipient | 100 recipients |
+| ------------------- | ------------- | -------------- |
+| CPU instructions    | ~TODO         | ~TODO          |
+| Memory (bytes)      | ~TODO         | ~TODO          |
+
+If the test fails, lower `MAX_ALLOCATIONS` rather than raising the assertion thresholds.
+
+## TTL bumps
+
+Soroban archives entries whose TTL runs out; restoring an archived entry costs extra and requires a separate transaction. Both contracts expose a permissionless `bump(accounts: Vec<Address>)` that extends the TTL of the contract instance and of the per-account entry (`Balance(account)` in `property-token`, `Claimable(account)` in `yield-distributor`). It requires no auth, so anyone can keep state alive.
+
+The backend should call `bump` from a scheduled job:
+
+- Periodically (well before the ~30 day TTL expires) for the instance and for every active holder, so balances and unclaimed payouts never archive.
+- After long periods of inactivity (for example a property with no transfers or claims for weeks), and before any operation that reads many holder entries.
+- Batch accounts into several calls if the list is large; each call extends only the entries it is given plus the instance.
 
 ## property-factory
 

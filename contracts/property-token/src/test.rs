@@ -444,6 +444,41 @@ fn cancel_pending_admin() {
 }
 
 #[test]
+fn bump_keeps_balances_live_past_original_ttl() {
+    let s = setup();
+    let alice = investor(&s);
+    let bob = investor(&s);
+    s.client.mint(&alice, &600);
+    s.client.mint(&bob, &400);
+
+    // Advance well past the original TTL so the entries would otherwise be archived.
+    s.env
+        .ledger()
+        .set_sequence_number(s.env.ledger().sequence() + TTL_EXTEND_TO + 1);
+
+    s.client.bump(&Vec::from_array(&s.env, [alice.clone(), bob.clone()]));
+
+    // Entries are still live and readable after the bump.
+    assert_eq!(s.client.balance(&alice), 600);
+    assert_eq!(s.client.balance(&bob), 400);
+    assert_eq!(s.client.total_supply(), 1_000);
+}
+
+#[test]
+fn bump_with_account_without_balance_entry_does_not_panic() {
+    let s = setup();
+    let alice = investor(&s);
+    let stranger = Address::generate(&s.env);
+    s.client.mint(&alice, &10);
+
+    // Bumping an account that has no balance entry must not panic.
+    s.client
+        .bump(&Vec::from_array(&s.env, [alice.clone(), stranger]));
+
+    assert_eq!(s.client.balance(&alice), 10);
+}
+
+#[test]
 fn max_per_holder_defaults_to_none() {
     let s = setup();
     assert_eq!(s.client.max_per_holder(), None);

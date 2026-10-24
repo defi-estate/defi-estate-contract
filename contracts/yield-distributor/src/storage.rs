@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Env};
+use soroban_sdk::{contracttype, Address, Env, Vec};
 
 /// About 30 days at 5 second ledgers.
 const TTL_EXTEND_TO: u32 = 518_400;
@@ -35,6 +35,20 @@ pub fn extend_instance(env: &Env) {
     env.storage()
         .instance()
         .extend_ttl(TTL_THRESHOLD, TTL_EXTEND_TO);
+}
+
+/// Extends the TTL of the instance storage and of the claimable entry for
+/// each account that has one. Accounts without a claimable entry are skipped.
+pub fn bump(env: &Env, accounts: &Vec<Address>) {
+    extend_instance(env);
+    for account in accounts.iter() {
+        let key = DataKey::Claimable(account.clone());
+        if env.storage().persistent().has(&key) {
+            env.storage()
+                .persistent()
+                .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        }
+    }
 }
 
 pub fn admin(env: &Env) -> Address {

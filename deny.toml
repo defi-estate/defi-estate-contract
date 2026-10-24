@@ -1,0 +1,98 @@
+# cargo-deny configuration for the Soroban contracts workspace.
+#
+# Run locally with:
+#   cargo deny check
+# or via the project Makefile:
+#   make check
+#
+# CI runs this on every pull request (see .github/workflows/contracts-ci.yml).
+# The goal is to fail the build on a new security advisory or an unlisted
+# license, since these contracts hold investor funds.
+
+[graph]
+# Analyze all targets (including dev-dependencies and build scripts) so that
+# advisories and licenses are checked across the whole dependency graph.
+all-features = true
+
+# ---------------------------------------------------------------------------
+# Advisories: known vulnerabilities (RustSec advisory database)
+# ---------------------------------------------------------------------------
+[advisories]
+# Fail the build if a dependency has a known security advisory.
+vulnerability = "deny"
+# Fail on unmaintained crates.
+unmaintained = "deny"
+# Fail on crates that have been yanked from crates.io.
+yanked = "deny"
+# Fail on advisories that have been withdrawn (kept strict for clarity).
+ignore = [
+    # No current findings are ignored. If an advisory must be temporarily
+    # ignored, add an entry here in the form:
+    #
+    #   "RUSTSEC-0000-0000", # <reason>; review by YYYY-MM-DD
+    #
+    # Every ignored advisory MUST have an inline comment explaining why it is
+    # safe to ignore and a review date by which it must be re-evaluated.
+]
+
+# ---------------------------------------------------------------------------
+# Licenses: only permissive licenses are allowed
+# ---------------------------------------------------------------------------
+[licenses]
+# Fail on any license not explicitly allowed below.
+unlicensed = "deny"
+# Fail if a crate's license cannot be determined.
+allow-osi-fsf-free = "either"
+# Do not allow copyleft licenses by default.
+copyleft = "deny"
+# Confidence threshold for license detection.
+confidence-threshold = 0.8
+
+# Permissive licenses that are acceptable for this project.
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "CC0-1.0",
+    "Unlicense",
+    "0BSD",
+]
+
+# Per-crate license exceptions. Each entry must be justified with a comment.
+exceptions = [
+    # No exceptions are currently required. If a dependency ships under a
+    # license not listed in `allow` above, add it here in the form:
+    #
+    #   { allow = ["<License>"], name = "<crate>", version = "*" },
+    #   # <reason this license is acceptable for this crate>
+]
+
+# ---------------------------------------------------------------------------
+# Bans: disallow duplicate or problematic crates
+# ---------------------------------------------------------------------------
+[bans]
+# Warn (do not fail) on multiple versions of the same crate to keep the
+# dependency tree reviewable without blocking on transitive duplicates.
+multiple-versions = "warn"
+# Fail on wildcard version requirements in direct dependencies.
+wildcards = "deny"
+# Fail on dependencies that are explicitly banned.
+deny = [
+    # No crates are currently banned.
+]
+
+# ---------------------------------------------------------------------------
+# Sources: only allow crates from crates.io
+# ---------------------------------------------------------------------------
+[sources]
+# Fail on dependencies sourced from anywhere other than crates.io.
+unknown-registry = "deny"
+unknown-git = "deny"
+# Only crates.io is an allowed registry.
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# No git dependencies are allowed.
+allow-git = []

@@ -16,7 +16,7 @@ mod test;
 
 pub use errors::Error;
 
-use soroban_sdk::{contract, contractimpl, panic_with_error, Address, BytesN, Env, String};
+use soroban_sdk::{contract, contractimpl, panic_with_error, Address, BytesN, Env, String, Vec};
 use storage::DataKey;
 
 /// Contract version, bumped on every upgrade.
@@ -212,6 +212,12 @@ impl PropertyToken {
 
         storage::spend_allowance(&env, &from, &spender, amount);
         burn_shares(&env, &from, amount);
+    }
+
+    /// Extends the TTL of the contract instance and of each account's balance
+    /// entry. Permissionless: anyone can keep entries from being archived.
+    pub fn bump(env: Env, accounts: Vec<Address>) {
+        storage::bump(&env, &accounts);
     }
 
     // Views

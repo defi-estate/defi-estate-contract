@@ -1,5 +1,7 @@
 # defi-estate-contract
 
+[![Contracts CI](https://github.com/defi-estate/defi-estate-contract/actions/workflows/contracts-ci.yml/badge.svg)](https://github.com/defi-estate/defi-estate-contract/actions/workflows/contracts-ci.yml)
+
 Soroban smart contracts for [defi-estate](https://github.com/defi-estate), a real estate tokenization and rental yield platform on Stellar. One `property-token` and one `yield-distributor` are deployed per property.
 
 | Crate | Purpose |
@@ -25,6 +27,18 @@ make check                 # fmt, clippy, test, wasm build (same as CI)
 cargo test
 stellar contract build     # or: cargo build --target wasm32v1-none --release
 make fix                   # cargo fmt
+```
+
+## Test coverage
+
+CI measures line coverage of the contracts with [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov) on every pull request. The job fails if line coverage drops below **85%**, and the generated `lcov.info` report is uploaded as the `coverage-lcov` workflow artifact (Actions → **Contracts CI** → the run).
+
+Run it locally:
+
+```bash
+cargo install cargo-llvm-cov
+cargo llvm-cov --workspace --lcov --output-path lcov.info
+cargo llvm-cov --workspace --summary-only   # human-readable summary
 ```
 
 ## Deploy
